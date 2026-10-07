@@ -1,12 +1,12 @@
 from flask import Flask, Response, jsonify, render_template, request, send_file, send_from_directory, url_for
 from pathlib import Path
 from io import BytesIO
-from datetime import datetime
 import json
 import queue
 import threading
 import uuid
 import zipfile
+from datetime import datetime
 
 from app.graph.workflow import app as graph_app
 from logger import get_logger
@@ -54,104 +54,117 @@ def _event(message: str, stage: str, status: str = "running", data=None) -> str:
     return f"data: {json.dumps(payload, default=str)}\n\n"
 
 
-def _emit_state_events(previous: dict | None, current: dict, events: queue.Queue):
+def _merge_update(state: dict, update: dict) -> None:
     """
-    Convert real LangGraph state changes into user-facing SSE milestones.
-    No workflow progress is invented; each milestone is caused by a state change.
+    Reconstruct the final parent state from LangGraph state updates.
+
+    The existing State definition uses operator.add for sections, so
+    section updates must be appended rather than overwritten.
     """
-    previous = previous or {}
-
-    if not previous:
-        events.put(_event("Starting Blog Writing Agent", "planning"))
-
-    if current.get("mode") and current.get("mode") != previous.get("mode"):
-        if current.get("needs_research"):
-            events.put(_event(
-                "Research required; routing to web research",
-                "research",
-                data={"mode": current.get("mode")}
-            ))
+    for key, value in update.items():
+        if key == "sections":
+            state["sections"].extend(value or [])
         else:
-            events.put(_event(
-                "Research not required; continuing with planning",
-                "planning",
-                data={"mode": current.get("mode")}
-            ))
-
-    old_evidence = previous.get("evidence") or []
-    new_evidence = current.get("evidence") or []
-    if len(new_evidence) > len(old_evidence):
-        events.put(_event(
-            f"Research completed ({len(new_evidence)} sources)",
-            "research",
-            data={"source_count": len(new_evidence)}
-        ))
-
-    if current.get("plan") is not None and previous.get("plan") is None:
-        plan = current["plan"]
-        tasks = getattr(plan, "tasks", []) or []
-        events.put(_event(
-            f"Blog plan created ({len(tasks)} sections)",
-            "planning",
-            data={"sections": len(tasks)}
-        ))
-
-    old_sections = previous.get("sections") or []
-    new_sections = current.get("sections") or []
-    if len(new_sections) > len(old_sections):
-        events.put(_event(
-            f"Writing in progress ({len(new_sections)} section update(s) completed)",
-            "writing",
-            data={"sections_completed": len(new_sections)}
-        ))
-
-    if current.get("merged_md") and current.get("merged_md") != previous.get("merged_md"):
-        events.put(_event("Written sections merged", "finalizing"))
-
-    old_specs = previous.get("image_specs") or []
-    new_specs = current.get("image_specs") or []
-    if len(new_specs) != len(old_specs):
-        events.put(_event(
-            f"Image plan created ({len(new_specs)} visual(s))",
-            "images",
-            data={"images": len(new_specs)}
-        ))
-
-    old_images = previous.get("generated_images") or []
-    new_images = current.get("generated_images") or []
-    if len(new_images) > len(old_images):
-        events.put(_event(
-            f"Image generation completed ({len(new_images)} image(s))",
-            "images",
-            data={"images": len(new_images)}
-        ))
-
-    if current.get("final") and current.get("final") != previous.get("final"):
-        events.put(_event("Final blog assembled and saved", "finalizing"))
+            state[key] = value
 
 
 def _run_job(job_id: str, topic: str):
     events = JOBS[job_id]["queue"]
+    state = _initial_state(topic)
+    first_event = True
 
     try:
-        final_state = None
-        previous_state = None
-
-        # One real LangGraph execution. Cumulative state updates let us both
-        # stream milestones and retain the final state without a second invoke.
-        for current_state in graph_app.stream(
+        # Stream the existing graph and its reducer subgraph. LangGraph exposes
+        # subgraph node updates when subgraphs=True.
+        for namespace, chunk in graph_app.stream(
             _initial_state(topic),
-            stream_mode="values",
+            stream_mode="updates",
+            subgraphs=True,
         ):
-            final_state = current_state
-            _emit_state_events(previous_state, current_state, events)
-            previous_state = current_state
+            if first_event:
+                events.put(_event("Starting Blog Writing Agent", "planning"))
+                first_event = False
 
-        if final_state is None or not final_state.get("final"):
+            if not chunk:
+                continue
+
+            update = next(iter(chunk.values()))
+            node_name = next(iter(chunk.keys()))
+            _merge_update(state, update)
+
+            is_subgraph = bool(namespace)
+
+            if node_name == "router":
+                if state.get("needs_research"):
+                    events.put(_event(
+                        "Research required; routing to web research",
+                        "research",
+                        data={"mode": state.get("mode")}
+                    ))
+                else:
+                    events.put(_event(
+                        "Research not required; continuing with planning",
+                        "planning",
+                        data={"mode": state.get("mode")}
+                    ))
+
+            elif node_name == "research":
+                events.put(_event(
+                    f"Research completed ({len(state.get('evidence') or [])} sources)",
+                    "research",
+                    data={"source_count": len(state.get("evidence") or [])}
+                ))
+
+            elif node_name == "orchestrator":
+                plan = state.get("plan")
+                task_count = len(getattr(plan, "tasks", []) or []) if plan else 0
+                events.put(_event(
+                    f"Blog plan created ({task_count} sections)",
+                    "planning",
+                    data={"sections": task_count}
+                ))
+
+            elif node_name == "worker":
+                completed = len(state.get("sections") or [])
+                events.put(_event(
+                    f"Writing in progress ({completed} section(s) completed)",
+                    "writing",
+                    data={"sections_completed": completed}
+                ))
+
+            elif is_subgraph and node_name == "merge_content":
+                events.put(_event("Merging written sections", "finalizing"))
+
+            elif is_subgraph and node_name == "decide_images":
+                count = len(state.get("image_specs") or [])
+                events.put(_event(
+                    f"Image plan created ({count} visual(s))",
+                    "images",
+                    data={"images": count}
+                ))
+
+            elif is_subgraph and node_name == "generate_images":
+                count = len(state.get("generated_images") or [])
+                events.put(_event(
+                    f"Image generation completed ({count} image(s))",
+                    "images",
+                    data={"images": count}
+                ))
+
+            elif is_subgraph and node_name == "replace_image_placeholders":
+                events.put(_event(
+                    "Finalizing blog and replacing image placeholders",
+                    "finalizing"
+                ))
+
+            # The parent 'reducer' roll-up is intentionally not emitted as a
+            # separate event because its child updates already describe it.
+
+        if not state.get("final"):
             raise RuntimeError("LangGraph completed without producing a final blog.")
 
         with JOBS_LOCK:
-            JOBS[job_id]["state"] = final_state
+            JOBS[job_id]["state"] = state
             JOBS[job_id]["status"] = "completed"
 
         events.put(_event(
@@ -166,11 +179,13 @@ def _run_job(job_id: str, topic: str):
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "failed"
             JOBS[job_id]["error"] = str(exc)
+
         events.put(_event(
             f"Generation failed: {exc}",
             "error",
             "failed",
         ))
+
     finally:
         events.put(None)
 
@@ -192,13 +207,12 @@ def generate():
         return jsonify({"error": "Blog topic must be 500 characters or fewer."}), 400
 
     job_id = uuid.uuid4().hex
-    job_queue = queue.Queue()
 
     with JOBS_LOCK:
         JOBS[job_id] = {
             "status": "running",
             "topic": topic,
-            "queue": job_queue,
+            "queue": queue.Queue(),
             "state": None,
             "error": None,
         }
