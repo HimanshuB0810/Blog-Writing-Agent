@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blog Writing Agent</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">AI CONTENT ENGINE</div>
+        <h1>BLOG WRITING AGENT</h1>
+        <p>Research → Plan → Write → Illustrate → Finalize</p>
+      </div>
+    </header>
+
+    <section class="composer card">
+      <label for="topic">Blog topic</label>
+      <textarea id="topic" rows="5" maxlength="500" placeholder="Enter your blog topic...">Explain Transformer Architecture and Self-Attention</textarea>
+      <div class="composer-footer">
+        <span id="char-count">0 / 500</span>
+        <button id="generate-btn" class="primary-button">Generate Blog</button>
+      </div>
+    </section>
+
+    <section id="progress-section" class="card hidden">
+      <div class="section-header">
+        <div>
+          <div class="eyebrow">AGENT EXECUTION</div>
+          <h2>Workflow</h2>
+        </div>
+        <span id="run-status" class="status-pill">Ready</span>
+      </div>
+
+      <div class="workflow-steps">
+        <div class="workflow-step" data-stage="planning">
+          <span class="step-icon">○</span>
+          <span>Planning</span>
+        </div>
+        <div class="workflow-step" data-stage="research">
+          <span class="step-icon">○</span>
+          <span>Researching</span>
+        </div>
+        <div class="workflow-step" data-stage="writing">
+          <span class="step-icon">○</span>
+          <span>Writing</span>
+        </div>
+        <div class="workflow-step" data-stage="images">
+          <span class="step-icon">○</span>
+          <span>Generating Images</span>
+        </div>
+        <div class="workflow-step" data-stage="finalizing">
+          <span class="step-icon">○</span>
+          <span>Finalizing</span>
+        </div>
+      </div>
+
+      <div id="event-log" class="event-log" aria-live="polite"></div>
+    </section>
+
+    <section id="result-section" class="card hidden">
+      <div class="section-header">
+        <div>
+          <div class="eyebrow">GENERATED BLOG</div>
+          <h2>Preview</h2>
+        </div>
+        <div class="result-actions">
+          <a id="download-md" class="secondary-button" href="#" download>Download Markdown</a>
+          <a id="download-package" class="secondary-button" href="#" download>Download Blog Package</a>
+        </div>
+      </div>
+      <article id="blog-preview" class="blog-preview"></article>
+    </section>
+
+    <section id="error-section" class="error-card hidden">
+      <strong>Generation failed</strong>
+      <p id="error-message"></p>
+    </section>
+  </main>
+
+  <script>
+    window.BLOG_IMAGE_ENDPOINT = "{{ url_for('blog_image', job_id='__JOB_ID__', filename='__FILE__') }}";
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
