@@ -7,11 +7,9 @@ import queue
 import threading
 import uuid
 import zipfile
-import re
 
 from app.graph.workflow import app as graph_app
 from logger import get_logger
-from custom_execption import CustomException
 
 logger = get_logger(__name__)
 
@@ -56,114 +54,123 @@ def _event(message: str, stage: str, status: str = "running", data=None) -> str:
     return f"data: {json.dumps(payload, default=str)}\n\n"
 
 
-def _node_event(node_name: str) -> tuple[str, str]:
-    mapping = {
-        "router": ("Planning", "planning"),
-        "research": ("Researching", "research"),
-        "orchestrator": ("Planning sections", "planning"),
-        "worker": ("Writing blog sections", "writing"),
-        "reducer": ("Finalizing content and visuals", "finalizing"),
-        "merge_content": ("Merging written sections", "finalizing"),
-        "decide_images": ("Planning images", "images"),
-        "generate_images": ("Generating images", "images"),
-        "replace_image_placeholders": ("Finalizing blog", "finalizing"),
-    }
-    return mapping.get(node_name, (node_name.replace("_", " ").title(), node_name))
+def _emit_state_events(previous: dict | None, current: dict, events: queue.Queue):
+    """
+    Convert real LangGraph state changes into user-facing SSE milestones.
+    No workflow progress is invented; each milestone is caused by a state change.
+    """
+    previous = previous or {}
+
+    if not previous:
+        events.put(_event("Starting Blog Writing Agent", "planning"))
+
+    if current.get("mode") and current.get("mode") != previous.get("mode"):
+        if current.get("needs_research"):
+            events.put(_event(
+                "Research required; routing to web research",
+                "research",
+                data={"mode": current.get("mode")}
+            ))
+        else:
+            events.put(_event(
+                "Research not required; continuing with planning",
+                "planning",
+                data={"mode": current.get("mode")}
+            ))
+
+    old_evidence = previous.get("evidence") or []
+    new_evidence = current.get("evidence") or []
+    if len(new_evidence) > len(old_evidence):
+        events.put(_event(
+            f"Research completed ({len(new_evidence)} sources)",
+            "research",
+            data={"source_count": len(new_evidence)}
+        ))
+
+    if current.get("plan") is not None and previous.get("plan") is None:
+        plan = current["plan"]
+        tasks = getattr(plan, "tasks", []) or []
+        events.put(_event(
+            f"Blog plan created ({len(tasks)} sections)",
+            "planning",
+            data={"sections": len(tasks)}
+        ))
+
+    old_sections = previous.get("sections") or []
+    new_sections = current.get("sections") or []
+    if len(new_sections) > len(old_sections):
+        events.put(_event(
+            f"Writing in progress ({len(new_sections)} section update(s) completed)",
+            "writing",
+            data={"sections_completed": len(new_sections)}
+        ))
+
+    if current.get("merged_md") and current.get("merged_md") != previous.get("merged_md"):
+        events.put(_event("Written sections merged", "finalizing"))
+
+    old_specs = previous.get("image_specs") or []
+    new_specs = current.get("image_specs") or []
+    if len(new_specs) != len(old_specs):
+        events.put(_event(
+            f"Image plan created ({len(new_specs)} visual(s))",
+            "images",
+            data={"images": len(new_specs)}
+        ))
+
+    old_images = previous.get("generated_images") or []
+    new_images = current.get("generated_images") or []
+    if len(new_images) > len(old_images):
+        events.put(_event(
+            f"Image generation completed ({len(new_images)} image(s))",
+            "images",
+            data={"images": len(new_images)}
+        ))
+
+    if current.get("final") and current.get("final") != previous.get("final"):
+        events.put(_event("Final blog assembled and saved", "finalizing"))
 
 
 def _run_job(job_id: str, topic: str):
     events = JOBS[job_id]["queue"]
+
     try:
-        events.put(_event("Starting Blog Writing Agent", "start"))
-
         final_state = None
-        last_node = None
+        previous_state = None
 
-        # stream_mode="updates" yields actual node/subgraph state updates.
-        for update in graph_app.stream(_initial_state(topic), stream_mode="updates"):
-            if not update:
-                continue
+        # One real LangGraph execution. Cumulative state updates let us both
+        # stream milestones and retain the final state without a second invoke.
+        for current_state in graph_app.stream(
+            _initial_state(topic),
+            stream_mode="values",
+        ):
+            final_state = current_state
+            _emit_state_events(previous_state, current_state, events)
+            previous_state = current_state
 
-            node_name = next(iter(update))
-            node_update = update[node_name] or {}
-            last_node = node_name
+        if final_state is None or not final_state.get("final"):
+            raise RuntimeError("LangGraph completed without producing a final blog.")
 
-            message, stage = _node_event(node_name)
-
-            if node_name == "router":
-                mode = node_update.get("mode")
-                needs_research = node_update.get("needs_research")
-                if needs_research:
-                    message = "Research required; preparing web research"
-                else:
-                    message = "Research not required; using closed-book planning"
-                events.put(_event(message, stage, data={"mode": mode, "needs_research": needs_research}))
-
-            elif node_name == "research":
-                evidence = node_update.get("evidence", [])
-                events.put(_event(
-                    f"Research completed ({len(evidence)} sources)",
-                    stage,
-                    data={"source_count": len(evidence)}
-                ))
-
-            elif node_name == "orchestrator":
-                plan = node_update.get("plan")
-                task_count = len(getattr(plan, "tasks", [])) if plan is not None else 0
-                events.put(_event(
-                    f"Plan created with {task_count} sections",
-                    stage,
-                    data={"sections": task_count}
-                ))
-
-            elif node_name == "worker":
-                sections = node_update.get("sections", [])
-                events.put(_event(
-                    f"Section writing completed ({len(sections)} update(s))",
-                    stage,
-                    data={"sections_completed": len(sections)}
-                ))
-
-            elif node_name == "decide_images":
-                image_specs = node_update.get("image_specs", [])
-                events.put(_event(
-                    f"Image plan created ({len(image_specs)} visual(s))",
-                    stage,
-                    data={"images": len(image_specs)}
-                ))
-
-            elif node_name == "generate_images":
-                images = node_update.get("generated_images", [])
-                events.put(_event(
-                    f"Image generation completed ({len(images)} image(s))",
-                    stage,
-                    data={"images": len(images)}
-                ))
-
-            else:
-                events.put(_event(message, stage))
-
-            final_state = node_update if node_update.get("final") else final_state
-
-        # The stream does not necessarily expose a final aggregated object,
-        # so retrieve the completed state with one final invoke only when needed.
-        if not final_state or "final" not in final_state:
-            final_state = graph_app.invoke(_initial_state(topic))
-
-        blog_id = job_id
         with JOBS_LOCK:
             JOBS[job_id]["state"] = final_state
             JOBS[job_id]["status"] = "completed"
 
-        events.put(_event("Blog generation completed", "complete", "completed", {
-            "blog_id": blog_id,
-        }))
+        events.put(_event(
+            "Blog generation completed",
+            "complete",
+            "completed",
+            {"blog_id": job_id},
+        ))
+
     except Exception as exc:
         logger.exception("Blog generation failed")
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "failed"
             JOBS[job_id]["error"] = str(exc)
-        events.put(_event(f"Generation failed: {exc}", "error", "failed"))
+        events.put(_event(
+            f"Generation failed: {exc}",
+            "error",
+            "failed",
+        ))
     finally:
         events.put(None)
 
@@ -180,6 +187,7 @@ def generate():
 
     if not topic:
         return jsonify({"error": "Blog topic is required."}), 400
+
     if len(topic) > 500:
         return jsonify({"error": "Blog topic must be 500 characters or fewer."}), 400
 
@@ -195,8 +203,11 @@ def generate():
             "error": None,
         }
 
-    thread = threading.Thread(target=_run_job, args=(job_id, topic), daemon=True)
-    thread.start()
+    threading.Thread(
+        target=_run_job,
+        args=(job_id, topic),
+        daemon=True,
+    ).start()
 
     return jsonify({
         "id": job_id,
@@ -214,7 +225,7 @@ def stream_events(job_id: str):
     if not job:
         return jsonify({"error": "Generation job not found."}), 404
 
-    def generate():
+    def event_stream():
         while True:
             item = job["queue"].get()
             if item is None:
@@ -222,7 +233,7 @@ def stream_events(job_id: str):
             yield item
 
     return Response(
-        generate(),
+        event_stream(),
         mimetype="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -239,12 +250,15 @@ def get_blog(job_id: str):
 
     if not job:
         return jsonify({"error": "Blog not found."}), 404
+
     if job["status"] == "failed":
         return jsonify({"error": job["error"]}), 500
+
     if job["status"] != "completed":
         return jsonify({"status": job["status"]}), 202
 
     state = job["state"]
+
     return jsonify({
         "id": job_id,
         "topic": job["topic"],
@@ -263,41 +277,47 @@ def blog_image(job_id: str, filename: str):
         return jsonify({"error": "Blog not found."}), 404
 
     safe_name = Path(filename).name
+    generated_images = (job.get("state") or {}).get("generated_images", [])
     allowed_images = {
         Path(item["path"]).name
-        for item in (job.get("state") or {}).get("generated_images", [])
+        for item in generated_images
+        if item.get("path")
     }
+
     if safe_name not in allowed_images:
         return jsonify({"error": "Image not found."}), 404
 
     return send_from_directory(IMAGE_DIR, safe_name)
 
 
-def _job_blog_path(job_id: str) -> Path:
+def _job_blog_path(job_id: str) -> Path | None:
     with JOBS_LOCK:
         job = JOBS.get(job_id)
+
     if not job or job["status"] != "completed":
         return None
 
     markdown = job["state"].get("final", "")
-    files = list(BLOG_DIR.glob("*.md"))
-    if not files:
-        return None
+    markdown_files = sorted(
+        BLOG_DIR.glob("*.md"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
 
-    topic = job["topic"]
-    candidates = sorted(files, key=lambda p: p.stat().st_mtime, reverse=True)
-    for candidate in candidates:
+    for candidate in markdown_files:
         try:
             if candidate.read_text(encoding="utf-8") == markdown:
                 return candidate
         except OSError:
             continue
-    return candidates[0]
+
+    return markdown_files[0] if markdown_files else None
 
 
 @web_app.get("/api/blog/<job_id>/download")
 def download_markdown(job_id: str):
     markdown_path = _job_blog_path(job_id)
+
     if markdown_path is None:
         return jsonify({"error": "Completed blog file not found."}), 404
 
@@ -312,27 +332,37 @@ def download_markdown(job_id: str):
 @web_app.get("/api/blog/<job_id>/package")
 def download_package(job_id: str):
     markdown_path = _job_blog_path(job_id)
+
     if markdown_path is None:
         return jsonify({"error": "Completed blog file not found."}), 404
 
     with JOBS_LOCK:
         job = JOBS.get(job_id)
 
-    state = job["state"]
     image_names = {
         Path(item["path"]).name
-        for item in state.get("generated_images", [])
+        for item in job["state"].get("generated_images", [])
+        if item.get("path")
     }
 
     buffer = BytesIO()
+
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.write(markdown_path, arcname=f"BLOG/{markdown_path.name}")
+        archive.write(
+            markdown_path,
+            arcname=f"BLOG/{markdown_path.name}",
+        )
+
         for image_name in image_names:
             image_path = IMAGE_DIR / image_name
             if image_path.is_file():
-                archive.write(image_path, arcname=f"BLOG/images/{image_name}")
+                archive.write(
+                    image_path,
+                    arcname=f"BLOG/images/{image_name}",
+                )
 
     buffer.seek(0)
+
     return send_file(
         buffer,
         as_attachment=True,
@@ -341,6 +371,5 @@ def download_package(job_id: str):
     )
 
 
-# Development entry point.
 if __name__ == "__main__":
     web_app.run(debug=True)
