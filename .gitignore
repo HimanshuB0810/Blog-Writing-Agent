@@ -3,3 +3,11 @@ venv/
 .logs/
 
 BLOG WRITING AGENT/BLOG_WRITING_AGENT.egg-info/
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
