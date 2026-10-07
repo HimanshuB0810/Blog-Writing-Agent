@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: BLOG-WRITING-AGENT
+Version: 0.1
+Author: Himanshu Borikar
+Requires-Dist: langgraph
+Requires-Dist: langchain
+Requires-Dist: langchain-google-genai
+Requires-Dist: google-generativeai
+Requires-Dist: dotenv
+Requires-Dist: langchain-groq
+Requires-Dist: streamlit
+Dynamic: author
+Dynamic: requires-dist

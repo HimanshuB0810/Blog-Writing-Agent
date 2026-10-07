@@ -1,0 +1,5 @@
+venv/
+.env/
+.logs/
+
+BLOG WRITING AGENT/BLOG_WRITING_AGENT.egg-info/

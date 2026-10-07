@@ -1,0 +1,30 @@
+2026-10-07 06:43:48,556 - INFO - Reducer SubGraph Compiled Successfully
+2026-10-07 06:43:48,581 - INFO - Main Workflow Compile Done
+2026-10-07 06:43:48,655 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:43:48,655 - WARNING - Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. Instead, we recommend to use AFC in Chat.send_message_stream.
+2026-10-07 06:43:50,166 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:43:50,170 - INFO - router node work completed
+2026-10-07 06:43:50,178 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:43:53,750 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:43:53,753 - INFO - Tavily Search Completed
+2026-10-07 06:43:53,753 - INFO - Fanout Started
+2026-10-07 06:43:53,756 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:43:53,760 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:43:53,764 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:43:53,767 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:43:56,105 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:43:56,107 - INFO - Woker Node Completed
+2026-10-07 06:43:56,515 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:43:56,517 - INFO - Woker Node Completed
+2026-10-07 06:43:56,822 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:43:56,825 - INFO - Woker Node Completed
+2026-10-07 06:43:58,153 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:43:58,156 - INFO - Woker Node Completed
+2026-10-07 06:43:58,161 - INFO - Merging Content Done
+2026-10-07 06:43:58,177 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-07 06:44:04,010 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-07 06:44:04,014 - INFO - Decide Images Done and Markdown with Placeholders
+2026-10-07 06:44:04,090 - INFO - Graphviz Made
+2026-10-07 06:44:04,090 - INFO - Image Generated and saved in the Images Folder
+2026-10-07 06:44:04,092 - INFO - Replaced placeholder with Images
+2026-10-07 06:44:04,093 - INFO - Run Function Invoked Successfully
