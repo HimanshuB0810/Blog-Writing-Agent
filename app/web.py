@@ -171,7 +171,12 @@ def _run_job(job_id: str, topic: str):
             "Blog generation completed",
             "complete",
             "completed",
-            {"blog_id": job_id},
+            {
+                "blog_id": job_id,
+                "markdown": state["final"],
+                "download_url": url_for("download_markdown", job_id=job_id),
+                "package_url": url_for("download_package", job_id=job_id),
+            },
         ))
 
     except Exception as exc:
