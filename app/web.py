@@ -167,6 +167,9 @@ def _run_job(job_id: str, topic: str):
             JOBS[job_id]["state"] = state
             JOBS[job_id]["status"] = "completed"
 
+        # _run_job executes in a background thread, so there is no Flask
+        # request context here. Do not call url_for() in this thread.
+        # Use stable relative API routes for the SSE payload instead.
         events.put(_event(
             "Blog generation completed",
             "complete",
@@ -174,8 +177,8 @@ def _run_job(job_id: str, topic: str):
             {
                 "blog_id": job_id,
                 "markdown": state["final"],
-                "download_url": url_for("download_markdown", job_id=job_id),
-                "package_url": url_for("download_package", job_id=job_id),
+                "download_url": f"/api/blog/{job_id}/download",
+                "package_url": f"/api/blog/{job_id}/package",
             },
         ))
 
