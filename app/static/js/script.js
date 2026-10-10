@@ -82,14 +82,17 @@ function prepareMarkdown(markdown, jobId) {
   );
 }
 
-async function showResult(jobId) {
-  const response = await fetch(`/api/blog/${jobId}`);
-  const data = await response.json();
+function markWorkflowComplete() {
+  runStatus.textContent = "Completed";
 
-  if (!response.ok) {
-    throw new Error(data.error || "Unable to load generated blog.");
-  }
+  document.querySelectorAll(".workflow-step").forEach((step) => {
+    step.classList.remove("active");
+    step.classList.add("done");
+    step.querySelector(".step-icon").textContent = "✓";
+  });
+}
 
+function renderResult(jobId, data) {
   const prepared = prepareMarkdown(data.markdown || "", jobId);
   const rendered = marked.parse(prepared, {
     gfm: true,
@@ -101,12 +104,18 @@ async function showResult(jobId) {
   downloadPackage.href = data.package_url;
 
   resultSection.classList.remove("hidden");
-  runStatus.textContent = "Completed";
-  document.querySelectorAll(".workflow-step").forEach((step) => {
-    step.classList.remove("active");
-    step.classList.add("done");
-    step.querySelector(".step-icon").textContent = "✓";
-  });
+  markWorkflowComplete();
+}
+
+async function showResult(jobId) {
+  const response = await fetch(`/api/blog/${jobId}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Unable to load generated blog.");
+  }
+
+  renderResult(jobId, data);
 }
 
 function connectToStream(streamUrl, jobId) {
@@ -120,7 +129,17 @@ function connectToStream(streamUrl, jobId) {
       if (payload.stage === "complete" && payload.status === "completed") {
         source.close();
         try {
-          await showResult(jobId);
+          // The completion event now contains the final Markdown and download
+          // URLs from the same LangGraph execution. No second request is needed.
+          if (payload.data && payload.data.markdown) {
+            renderResult(jobId, {
+              markdown: payload.data.markdown,
+              download_url: payload.data.download_url,
+              package_url: payload.data.package_url,
+            });
+          } else {
+            await showResult(jobId);
+          }
           resolve();
         } catch (error) {
           reject(error);
