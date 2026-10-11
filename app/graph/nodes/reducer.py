@@ -43,9 +43,21 @@ def decide_images(state: State) -> dict:
                     content=(
                         f"Blog kind: {plan.blog_kind}\n"
                         f"Topic: {state['topic']}\n\n"
-                        "Insert placeholders + propose image prompts.\n\n"
+
+                        "Generate exactly TWO images:\n"
+                        "1. Exactly ONE technical diagram using Graphviz. "
+                        "Set image_type='technical', provide a valid flowchart, "
+                        "and leave prompt empty.\n"
+                        "2. Exactly ONE decorative illustration using FLUX. "
+                        "Set image_type='decorative', provide a detailed prompt, "
+                        "and set flowchart to null.\n\n"
+
+                        "Place both images at relevant locations in the article. "
+                        "Return exactly two ImageSpec objects: one of each type.\n\n"
+
                         f"{merged_md}"
                     )
+                
                 ),
             ]
         )
