@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from app.graph.state import *
-from app.image_generation.flux import _huggingface_generate_image
+from app.image_generation.flux import generate_image
 from app.image_generation.graphviz import render_flowchart
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -62,34 +62,27 @@ def generate_images(state: State):
 
             # DECORATIVE → FLUX
 
+
             elif spec["image_type"] == "decorative":
 
-                image = _huggingface_generate_image(
-                    spec["prompt"]
+                output_path = IMAGE_DIR / Path(spec["filename"]).with_suffix(".png")
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                generate_image(
+                    prompt=spec["prompt"],
+                    output_path=str(output_path)
                 )
 
-                # output_path = Path("images") / spec["filename"]
+                relative_path = (
+                    Path("images") / Path(spec["filename"]).with_suffix(".png")
+                )
 
-                # output_path.parent.mkdir(
-                #     parents=True,
-                #     exist_ok=True
-                # )
-                
-                output_path = IMAGE_DIR / Path(spec["filename"]).with_suffix(".png")
-                relative_path = Path("images") / Path(spec["filename"]).with_suffix(".png").as_posix()
-
-
-
-                image.save(output_path)
-
-                path = str(relative_path)
-
+                path = relative_path.as_posix()
 
             else:
                 raise ValueError(
                     f"Unknown image type: {spec['image_type']}"
                 )
-
 
             generated_images.append({
                 "placeholder": spec["placeholder"],
@@ -97,6 +90,7 @@ def generate_images(state: State):
                 "alt": spec["alt"],
                 "caption": spec["caption"]
             })
+
 
         logger.info("Image Generated and saved in the Images Folder")
         return {

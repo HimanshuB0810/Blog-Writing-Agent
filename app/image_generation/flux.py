@@ -1,40 +1,70 @@
 import os
-from huggingface_hub import InferenceClient
-from configs.settings import FLUX_MODEL
+from pathlib import Path
+from urllib.parse import quote
 
-from logger import get_logger
+import requests
+from dotenv import load_dotenv
+from PIL import Image
+from io import BytesIO
+
 from custom_execption import CustomException
+from logger import get_logger
+
 logger = get_logger(__name__)
 
-def _huggingface_generate_image(prompt: str):
-    """
-    Generate an image using FLUX.1-schnell through
-    Hugging Face Inference Providers.
+load_dotenv()
 
-    Requires:
-        HUGGINGFACEHUB_API_TOKEN
-    """
+API_KEY = os.getenv("POLLINATIONS_API_KEY")
+
+
+def generate_image(prompt: str, output_path: str) -> str:
     try:
+            
 
-        api_key = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+        if not API_KEY:
+            raise ValueError("POLLINATIONS_API_KEY is missing from .env")
 
-        if not api_key:
-            raise RuntimeError(
-                "HUGGINGFACEHUB_API_TOKEN is not set."
-            )
+        url = f"https://gen.pollinations.ai/image/{quote(prompt, safe='')}"
 
-        client = InferenceClient(
-            api_key=api_key
+        params = {
+            "model": "flux",
+            "width": 1024,
+            "height": 1024,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {API_KEY}"
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=180,
         )
+        response.raise_for_status()
 
-        image = client.text_to_image(
-            prompt=prompt,
-            model=FLUX_MODEL
-        )
+        # Convert the returned image to PNG.
+        image = Image.open(BytesIO(response.content)).convert("RGB")
 
-        logger.info("Image Generation Completed")
-        return image
-    
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        image.save(path, format="PNG")
+
+        print(f"Image saved to: {path}")
+
     except Exception as e:
-            logger.error(f"Error in Image Generation {e}")
-            raise CustomException("Error in Image Generation",e)
+            logger.error(f"Error in Generating Image {e}")
+            raise CustomException("Error while Generating Image",e)
+    
+    return str(path)
+
+
+if __name__ == "__main__":
+    prompt = (
+        "Minimal editorial illustration of an AI research workspace, "
+        "abstract neural network connections, soft blue and violet palette, "
+        "clean composition, modern technology blog aesthetic, no text"
+    )
+
+    generate_image(prompt, "generated_images/decorative.png")

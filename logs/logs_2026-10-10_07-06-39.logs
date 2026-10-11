@@ -1,0 +1,38 @@
+2026-10-10 07:06:39,620 - INFO - Reducer SubGraph Compiled Successfully
+2026-10-10 07:06:39,630 - INFO - Main Workflow Compile Done
+2026-10-10 07:06:39,639 - WARNING -  * Debugger is active!
+2026-10-10 07:06:39,642 - INFO -  * Debugger PIN: 113-290-114
+2026-10-10 07:06:59,975 - INFO - 127.0.0.1 - - [10/Oct/2026 07:06:59] "GET / HTTP/1.1" 200 -
+2026-10-10 07:06:59,988 - INFO - 127.0.0.1 - - [10/Oct/2026 07:06:59] "GET /static/js/script.js HTTP/1.1" 200 -
+2026-10-10 07:06:59,988 - INFO - 127.0.0.1 - - [10/Oct/2026 07:06:59] "GET /static/css/style.css HTTP/1.1" 200 -
+2026-10-10 07:07:00,200 - INFO - 127.0.0.1 - - [10/Oct/2026 07:07:00] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-10-10 07:07:12,963 - INFO - 127.0.0.1 - - [10/Oct/2026 07:07:12] "[35m[1mPOST /api/generate HTTP/1.1[0m" 202 -
+2026-10-10 07:07:13,100 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-10 07:07:13,100 - WARNING - Direct use of automatic function calling (AFC) in Models.generate_content is not recommended. Instead, we recommend to use AFC in Chat.send_message. Similarly, direct use of AFC in Models.generate_content_stream is not recommended. Instead, we recommend to use AFC in Chat.send_message_stream.
+2026-10-10 07:07:14,589 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-10 07:07:14,592 - INFO - router node work completed
+2026-10-10 07:07:14,593 - INFO - 127.0.0.1 - - [10/Oct/2026 07:07:14] "GET /api/generate/fbd38995247842b88c6009518c0cc09f/stream HTTP/1.1" 200 -
+2026-10-10 07:07:14,596 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-10 07:07:17,354 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-10 07:07:17,357 - INFO - Tavily Search Completed
+2026-10-10 07:07:17,358 - INFO - Fanout Started
+2026-10-10 07:07:17,360 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-10 07:07:17,361 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-10 07:07:17,363 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-10 07:07:19,095 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-10 07:07:19,097 - INFO - Woker Node Completed
+2026-10-10 07:07:19,197 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-10 07:07:19,199 - INFO - Woker Node Completed
+2026-10-10 07:07:19,607 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-10 07:07:19,609 - INFO - Woker Node Completed
+2026-10-10 07:07:19,614 - INFO - Merging Content Done
+2026-10-10 07:07:19,621 - INFO - AFC is enabled with max remote calls: 10.
+2026-10-10 07:07:23,294 - INFO - HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent "HTTP/1.1 200 OK"
+2026-10-10 07:07:23,297 - INFO - Decide Images Done and Markdown with Placeholders
+2026-10-10 07:07:42,166 - INFO - Image Generated and saved in the Images Folder
+2026-10-10 07:07:42,168 - INFO - Blog saved to: /home/himanshu-borikar/Desktop/Himanshu/GENERATIVE AI & AGENTIC AI/LANGGRAPH/BLOG WRITING AGENT/BLOG/5 AI Workflow Mistakes That Are Ruining Your Productivity (And How to Fix Them).md
+2026-10-10 07:07:42,168 - INFO - Replaced placeholder with Images
+2026-10-10 07:07:42,181 - INFO - 127.0.0.1 - - [10/Oct/2026 07:07:42] "GET /api/blog/fbd38995247842b88c6009518c0cc09f/images/ai_latency_cost.png HTTP/1.1" 200 -
+2026-10-10 07:07:42,181 - INFO - 127.0.0.1 - - [10/Oct/2026 07:07:42] "GET /api/blog/fbd38995247842b88c6009518c0cc09f/images/architectural_antipatterns.png HTTP/1.1" 200 -
+2026-10-10 07:08:13,937 - INFO - 127.0.0.1 - - [10/Oct/2026 07:08:13] "GET /api/blog/fbd38995247842b88c6009518c0cc09f/package HTTP/1.1" 200 -
+2026-10-10 07:08:16,384 - INFO - 127.0.0.1 - - [10/Oct/2026 07:08:16] "GET /api/blog/fbd38995247842b88c6009518c0cc09f/download HTTP/1.1" 200 -
