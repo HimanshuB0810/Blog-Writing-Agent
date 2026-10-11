@@ -2,6 +2,12 @@
 
 An AI-powered technical blog generation system that turns a topic into a structured Markdown article with optional web research, parallel section drafting, and automatically generated visuals. It includes a Flask web interface for starting a run, watching live workflow progress, previewing the result, and downloading the Markdown or a ZIP package with its images.
 
+## 🎬 Project Demo
+Watch the Blog Writing Agent in action:
+
+https://github.com/user-attachments/assets/c90a9117-9ac3-423c-87c2-f36c7a42c699
+
+
 ## Overview
 
 The application uses a **LangGraph workflow** to coordinate the blog-writing process:
