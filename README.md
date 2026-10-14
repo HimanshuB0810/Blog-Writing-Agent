@@ -64,54 +64,7 @@ The system is designed for technical content such as AI/ML concepts, software en
 
 The graph routes the topic to research when needed, writes and illustrates the article, and then pauses for human approval. A request for changes loops through revision and review again.
 
-```text
-User enters a blog topic
-          |
-          v
-     Flask frontend
-          |
-          v
-      Router node
-       /       \\
- research      skip research
-    |               |
-    v               |
- Tavily search      |
-    |               |
-    +-------+-------+
-            |
-            v
-    Orchestrator / planner
-            |
-            v
-   Parallel section workers
-            |
-            v
-       Merge sections
-            |
-            v
-      Plan visuals
-            |
-            v
-     Generate images
-       /          \\
- Graphviz SVG    FLUX PNG
-       \\          /
-            v
- Replace image placeholders
-            |
-            v
-      Human review
-       /         \\
-  approve      request changes
-     |               |
-     v               v
- Save approved    Revise blog
-     |               |
-     v               +----> Human review
- Markdown / ZIP
- downloads
-```
+<img width="1024" height="1536" alt="Blog Generation Workflow Flowchart" src="https://github.com/user-attachments/assets/d4c1431e-6d72-417b-a2b0-7319453dd173" />
 
 ### Main workflow modules
 
