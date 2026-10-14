@@ -112,6 +112,16 @@ def _run_job(job_id: str, topic: str):
 
             node_name = next(iter(chunk.keys()))
             update = next(iter(chunk.values()))
+
+            # Interrupts are control-flow events, not ordinary state updates.
+            # The pending interrupt is read from the checkpoint after streaming.
+            if (
+                node_name == "__interrupt__"
+                or not isinstance(update, dict)
+                or "__interrupt__" in update
+            ):
+                continue
+
             _merge_update(progress_state, update)
             is_subgraph = bool(namespace)
 
