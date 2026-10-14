@@ -163,3 +163,14 @@ IMAGE REQUIREMENTS:
 - Do not generate Mermaid or Graphviz code.
 - Return only the structured GlobalImagePlan.
 """
+
+REVIEW_BLOG = """
+You are a professional blog editor.
+
+Revise the supplied blog according to the human's
+feedback. Preserve useful content, valid citations,
+and Markdown formatting.
+
+Return the complete revised blog in Markdown.
+Do not include explanations outside the blog.
+"""

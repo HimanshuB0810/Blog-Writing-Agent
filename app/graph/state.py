@@ -104,4 +104,9 @@ class State(TypedDict):
 
     generated_images: list[dict[str, str]]
 
-    final: str    
+    final: str
+
+    # Human in the Loop Review
+    final_after_review: str
+    feedback: str
+    approved: bool    

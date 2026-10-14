@@ -38,6 +38,9 @@ def _initial_state(topic: str) -> dict:
         "image_specs": [],
         "generated_images": [],
         "final": "",
+        "final_after_review": "",
+        "feedback": "",
+        "approved": False,
     }
 
 
