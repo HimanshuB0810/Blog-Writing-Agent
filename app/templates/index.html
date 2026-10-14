@@ -12,7 +12,7 @@
       <div>
         <div class="eyebrow">AI CONTENT ENGINE</div>
         <h1>BLOG WRITING AGENT</h1>
-        <p>Research → Plan → Write → Illustrate → Finalize</p>
+        <p>Research → Plan → Write → Illustrate → Review → Publish</p>
       </div>
     </header>
 
@@ -21,7 +21,7 @@
       <textarea id="topic" rows="5" maxlength="500" placeholder="Enter your blog topic...">Explain Transformer Architecture and Self-Attention</textarea>
       <div class="composer-footer">
         <span id="char-count">0 / 500</span>
-        <button id="generate-btn" class="primary-button">Generate Blog</button>
+        <button id="generate-btn" class="primary-button" type="button">Generate Blog</button>
       </div>
     </section>
 
@@ -31,7 +31,7 @@
           <div class="eyebrow">AGENT EXECUTION</div>
           <h2>Workflow</h2>
         </div>
-        <span id="run-status" class="status-pill">Ready</span>
+        <span id="run-status" class="status-pill" aria-live="polite">Ready</span>
       </div>
 
       <div class="workflow-steps">
@@ -55,6 +55,10 @@
           <span class="step-icon">○</span>
           <span>Finalizing</span>
         </div>
+        <div class="workflow-step" data-stage="review">
+          <span class="step-icon">○</span>
+          <span>Human Review</span>
+        </div>
       </div>
 
       <div id="event-log" class="event-log" aria-live="polite"></div>
@@ -63,19 +67,40 @@
     <section id="result-section" class="card hidden">
       <div class="section-header">
         <div>
-          <div class="eyebrow">GENERATED BLOG</div>
-          <h2>Preview</h2>
+          <div class="eyebrow">BLOG PREVIEW</div>
+          <h2>Review generated content</h2>
         </div>
-        <div class="result-actions">
+        <div id="result-actions" class="result-actions hidden">
           <a id="download-md" class="secondary-button" href="#" download>Download Markdown</a>
           <a id="download-package" class="secondary-button" href="#" download>Download Blog Package</a>
         </div>
       </div>
+
       <article id="blog-preview" class="blog-preview"></article>
+
+      <section id="review-panel" class="review-panel hidden" aria-labelledby="review-question">
+        <div class="eyebrow">HUMAN-IN-THE-LOOP</div>
+        <h3 id="review-question">Do you approve this blog?</h3>
+        <p id="review-instruction">Review the content. Approve it or request specific changes.</p>
+
+        <label for="review-feedback">Revision suggestions</label>
+        <textarea
+          id="review-feedback"
+          rows="4"
+          maxlength="4000"
+          placeholder="Example: Add a code example for scaled dot-product attention and explain each line."
+        ></textarea>
+
+        <div class="review-actions">
+          <button id="approve-btn" class="primary-button" type="button">Approve Blog</button>
+          <button id="revise-btn" class="secondary-button" type="button">Request Changes</button>
+        </div>
+        <p id="review-status" class="review-status" role="status" aria-live="polite"></p>
+      </section>
     </section>
 
-    <section id="error-section" class="error-card hidden">
-      <strong>Generation failed</strong>
+    <section id="error-section" class="error-card hidden" role="alert">
+      <strong>Something went wrong</strong>
       <p id="error-message"></p>
     </section>
   </main>
