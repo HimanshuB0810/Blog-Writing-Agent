@@ -1,6 +1,6 @@
 # Blog Writing Agent
 
-An AI-powered technical blog generation system that turns a topic into a structured Markdown article with optional web research, parallel section drafting, and automatically generated visuals. It includes a Flask web interface for starting a run, watching live workflow progress, previewing the result, and downloading the Markdown or a ZIP package with its images.
+An AI-powered technical blog generation system that turns a topic into a structured Markdown article with conditional web research, parallel section drafting, automatically generated visuals, and a human-in-the-loop (HITL) review cycle. Its Flask interface streams workflow progress, presents the completed draft for approval or revision feedback, and provides downloadable Markdown and ZIP outputs after approval.
 
 ## 🎬 Project Demo
 Watch the Blog Writing Agent in action:
@@ -18,14 +18,20 @@ The application uses a **LangGraph workflow** to coordinate the blog-writing pro
 4. **Write sections in parallel** — generate each planned section as Markdown using LangGraph worker nodes.
 5. **Merge and plan visuals** — combine sections in the intended order and identify useful image placements.
 6. **Generate images** — create technical flowcharts with Graphviz and decorative illustrations through the Pollinations image API using the FLUX model.
-7. **Finalize the article** — replace image placeholders, save the Markdown file in `BLOG/`, and return the result to the UI.
+7. **Review the draft (HITL)** — pause the LangGraph workflow and show the generated blog for human review.
+8. **Revise or approve** — the reviewer can approve the blog or provide feedback; the agent revises the draft and presents it for review again until approved.
+9. **Save the approved article** — store the approved Markdown in `REVISED_BLOG/` and make it available to the UI for download.
 
 The system is designed for technical content such as AI/ML concepts, software engineering tutorials, architecture explainers, implementation guides, and topic roundups.
 
 ## Features
 
 - **Agentic writing workflow:** specialized routing, research, orchestration, writing, and reduction stages.
-- **Conditional web research:** uses Tavily Search when a topic may require fresh or time-sensitive information.
+- **Conditional web research:** the router decides whether a topic needs current web research and uses Tavily Search only when required.
+- **Source citations:** for research-backed topics, generated sections can link claims to URLs in the retrieved evidence so readers can inspect the original sources. Citations still require human verification.
+- **Human-in-the-loop review:** generation pauses after the draft and visuals are prepared, letting a user approve the blog or request revisions with specific feedback.
+- **Feedback-driven revision loop:** the LLM revises the full draft according to the feedback and returns it to the reviewer until approval.
+- **Approval-gated output:** the approved version is saved separately in `REVISED_BLOG/`.
 - **Structured planning:** defines sections, goals, key points, word-count targets, and citation/code requirements.
 - **Parallel section generation:** independent blog sections are drafted through LangGraph worker tasks.
 - **Automatic visual planning:** proposes relevant image locations and descriptions from the generated Markdown.
@@ -45,6 +51,7 @@ The system is designed for technical content such as AI/ML concepts, software en
 | LLM integration | LangChain, Google Generative AI |
 | LLM configured in the repository | `gemini-3.5-flash-lite` (configured in `configs/settings.py`) |
 | Agent workflow and orchestration | LangGraph |
+| Human-in-the-loop | LangGraph `interrupt()`, `InMemorySaver` checkpointer, Flask review endpoint |
 | Web research | Tavily Search |
 | Web application | Flask |
 | Frontend | HTML, CSS, JavaScript, Marked.js, DOMPurify |
@@ -54,6 +61,8 @@ The system is designed for technical content such as AI/ML concepts, software en
 | Output format | Markdown, SVG, PNG, ZIP |
 
 ## Architecture
+
+The graph routes the topic to research when needed, writes and illustrates the article, and then pauses for human approval. A request for changes loops through revision and review again.
 
 ```text
 User enters a blog topic
@@ -89,15 +98,25 @@ User enters a blog topic
  Graphviz SVG    FLUX PNG
        \\          /
             v
- Replace placeholders and save Markdown
+ Replace image placeholders
             |
             v
- Live preview + Markdown / ZIP downloads
+      Human review
+       /         \\
+  approve      request changes
+     |               |
+     v               v
+ Save approved    Revise blog
+     |               |
+     v               +----> Human review
+ Markdown / ZIP
+ downloads
 ```
 
 ### Main workflow modules
 
-- `app/graph/workflow.py` — defines and compiles the main LangGraph workflow.
+- `app/graph/workflow.py` — defines and compiles the main LangGraph workflow, including an in-memory checkpointer and the review/revision loop.
+- `app/graph/nodes/hitl.py` — pauses execution for human approval, validates feedback, revises the blog, and saves the approved version.
 - `app/graph/state.py` — contains the shared graph state and Pydantic models for the plan, research evidence, and visual specifications.
 - `app/graph/nodes/router_node.py` — classifies the topic and decides whether research is required.
 - `app/graph/nodes/research_node.py` — runs Tavily searches and normalizes the retrieved evidence.
@@ -123,6 +142,7 @@ Blog-Writing-Agent/
 │   │   │   ├── research_node.py
 │   │   │   ├── router_node.py
 │   │   │   ├── worker_node.py
+│   │   │   ├── hitl.py
 │   │   │   ├── reducer.py
 │   │   │   └── subgraph/
 │   │   │       └── reducer_subgraph.py
@@ -145,12 +165,24 @@ Blog-Writing-Agent/
 │   ├── models.py
 │   └── prompts/
 │       └── prompts.py
-├── BLOG/                 # Generated Markdown blogs and images
+├── BLOG/                 # Generated drafts and images
+├── REVISED_BLOG/          # Blogs approved through human review
+├── notebook/              # Step-by-step project development notebooks
+│   ├── 1.bwa_basics.ipynb
+│   ├── 2_bwa_improved_prompting.ipynb
+│   ├── 3.bwa_research.ipynb
+│   ├── 4.bwa_images.ipynb
+│   ├── 5.bwa_images_flowchart.ipynb
+│   └── 6.bwa_with_HITL.ipynb
 ├── logger.py
 ├── custom_execption.py
 ├── requirements.txt
 └── setup.py
 ```
+
+## Development Notebooks
+
+The `notebook/` directory documents the project's step-by-step evolution through Jupyter notebooks, from basic blog generation and prompt improvements to web research, image generation, Graphviz flowcharts, and the human-in-the-loop review workflow. These notebooks are useful for comparing iterations and understanding why features were introduced.
 
 ## Prerequisites
 
@@ -228,7 +260,7 @@ python -m app.main
 
 Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
-Enter a topic in the **Blog topic** field and click **Generate Blog**. The page displays workflow progress as the agent routes, researches when required, plans, writes, and generates visuals. When complete, review the blog preview or use the download links.
+Enter a topic in the **Blog topic** field and click **Generate Blog**. The page displays workflow progress as the agent routes, researches when required, plans, writes, and generates visuals. The workflow then pauses at **Human Review**. Inspect the rendered draft, click **Approve** to finish, or provide specific suggestions and click **Request Changes**. The agent revises the blog and returns the updated version for another review. Download links appear after approval.
 
 The repository also contains a direct Flask entry point in `app/web.py`, but `python -m app.main` is the intended entry point for the current layout.
 
@@ -241,7 +273,8 @@ The Flask interface currently exposes these endpoints:
 | `GET` | `/` | Serve the web interface. |
 | `POST` | `/api/generate` | Start a blog-generation job. Requires a JSON body with a `topic` field. |
 | `GET` | `/api/generate/<job_id>/stream` | Stream progress events using Server-Sent Events. |
-| `GET` | `/api/blog/<job_id>` | Retrieve the completed Markdown and download URLs, or the current job status. |
+| `GET` | `/api/blog/<job_id>` | Retrieve the blog, current status, or review draft. |
+| `POST` | `/api/blog/<job_id>/review` | Approve the draft or submit revision feedback; resumes the paused graph. The JSON body requires `approved` (boolean) and, when rejecting, a non-empty `feedback` string. |
 | `GET` | `/api/blog/<job_id>/images/<filename>` | Serve an image generated for the job, if it belongs to that job. |
 | `GET` | `/api/blog/<job_id>/download` | Download the Markdown file. |
 | `GET` | `/api/blog/<job_id>/package` | Download a ZIP with the Markdown blog and available generated images. |
@@ -258,7 +291,7 @@ A successful request returns HTTP `202` with a job ID and URLs for progress stre
 
 ## Output
 
-Generated Markdown articles are written to the `BLOG/` directory. Generated visuals are stored in `BLOG/images/`. The web application can package the Markdown and associated images into a ZIP download.
+Generated drafts and visuals are stored in `BLOG/` and `BLOG/images/`. After a reviewer approves the content, the approved Markdown is saved in `REVISED_BLOG/`. The web application provides a Markdown download and can package the approved article with its generated images into a ZIP download.
 
 The Markdown contains image links relative to the `BLOG/` directory, for example:
 
@@ -282,7 +315,7 @@ The repository also includes example generated articles and assets in `BLOG/`.
 ## Security and limitations
 
 - Keep API keys in `.env` and out of version control.
-- The current Flask application uses an in-memory job registry and daemon threads. It is suited to local development or demos, not durable multi-worker production deployment without additional job storage and execution infrastructure.
+- The current Flask application uses an in-memory job registry, daemon threads, and an `InMemorySaver` checkpointer. Review sessions and graph state are not durable across process restarts; use persistent job storage and a persistent LangGraph checkpointer for production deployment.
 - The current Flask entry point runs with `debug=True`; do not expose the development server directly to the public internet.
 - Research-dependent accuracy relies on the web results returned by Tavily and on the generated text correctly using the provided evidence.
 - LLM outputs and image generation can vary between runs and provider availability may change.
