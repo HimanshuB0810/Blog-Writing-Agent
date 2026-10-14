@@ -78,11 +78,17 @@ def _thread_config(job_id: str) -> dict:
 
 def _pending_interrupts(snapshot) -> list:
     """Return payloads from interrupts currently waiting in the graph."""
-    pending = []
-    for task in snapshot.tasks:
-        for interrupt_item in task.interrupts:
-            pending.append(interrupt_item.value)
-    return pending
+    # StateSnapshot.interrupts contains only interrupts still awaiting a response.
+    pending = getattr(snapshot, "interrupts", None)
+    if pending is not None:
+        return [item.value for item in pending]
+
+    # Compatibility fallback for older LangGraph versions.
+    return [
+        interrupt_item.value
+        for task in getattr(snapshot, "tasks", ())
+        for interrupt_item in getattr(task, "interrupts", ())
+    ]
 
 
 def _latest_markdown(state: dict) -> str:
