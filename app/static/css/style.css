@@ -25,9 +25,7 @@ button, textarea, a { font: inherit; }
   padding: 42px 0 72px;
 }
 
-.hero {
-  padding: 14px 0 28px;
-}
+.hero { padding: 14px 0 28px; }
 
 .eyebrow {
   font-size: 0.72rem;
@@ -36,9 +34,7 @@ button, textarea, a { font: inherit; }
   color: #8da3c7;
 }
 
-.hero h1, .section-header h2 {
-  margin: 8px 0 6px;
-}
+.hero h1, .section-header h2 { margin: 8px 0 6px; }
 
 .hero h1 {
   font-size: clamp(2rem, 5vw, 3.5rem);
@@ -58,10 +54,7 @@ button, textarea, a { font: inherit; }
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
 }
 
-.card {
-  padding: 24px;
-  margin-top: 18px;
-}
+.card { padding: 24px; margin-top: 18px; }
 
 .composer label {
   display: block;
@@ -118,11 +111,9 @@ textarea:focus {
   background: #121923;
 }
 
-.primary-button:hover, .secondary-button:hover {
-  transform: translateY(-1px);
-}
+.primary-button:hover, .secondary-button:hover { transform: translateY(-1px); }
 
-.primary-button:disabled {
+.primary-button:disabled, .secondary-button:disabled {
   cursor: wait;
   opacity: .58;
 }
@@ -135,9 +126,7 @@ textarea:focus {
   margin-bottom: 20px;
 }
 
-.section-header h2 {
-  font-size: 1.25rem;
-}
+.section-header h2 { font-size: 1.25rem; }
 
 .status-pill {
   display: inline-flex;
@@ -151,7 +140,7 @@ textarea:focus {
 
 .workflow-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 20px;
 }
@@ -204,18 +193,43 @@ textarea:focus {
   padding: 4px 0;
 }
 
-.event-time {
-  color: #5f718a;
-}
+.event-time { color: #5f718a; }
+.event-message { color: #cad4e1; }
 
-.event-message {
-  color: #cad4e1;
-}
-
-.result-actions {
+.result-actions, .review-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.review-panel {
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #26303d;
+}
+
+.review-panel h3 {
+  margin: 8px 0;
+  font-size: 1.25rem;
+}
+
+.review-panel p {
+  color: #9aa8bc;
+  line-height: 1.55;
+}
+
+.review-panel label {
+  display: block;
+  margin: 16px 0 8px;
+  font-weight: 650;
+}
+
+.review-actions { margin-top: 12px; }
+
+.review-status {
+  min-height: 1.4em;
+  margin-bottom: 0;
+  font-size: .9rem;
 }
 
 .blog-preview {
@@ -223,6 +237,7 @@ textarea:focus {
   margin: 8px auto 0;
   color: #dfe7f2;
   line-height: 1.75;
+  overflow-wrap: anywhere;
 }
 
 .blog-preview h1, .blog-preview h2, .blog-preview h3 {
@@ -243,9 +258,7 @@ textarea:focus {
   border: 1px solid #202a36;
 }
 
-.blog-preview code {
-  font-family: "SFMono-Regular", Consolas, monospace;
-}
+.blog-preview code { font-family: "SFMono-Regular", Consolas, monospace; }
 
 .blog-preview img {
   display: block;
@@ -256,13 +269,8 @@ textarea:focus {
   background: #0b1016;
 }
 
-.blog-preview p em {
-  color: #8996aa;
-}
-
-.blog-preview a {
-  color: #9bb6ff;
-}
+.blog-preview p em { color: #8996aa; }
+.blog-preview a { color: #9bb6ff; }
 
 .error-card {
   margin-top: 18px;
@@ -278,26 +286,21 @@ textarea:focus {
 
 .hidden { display: none !important; }
 
+@media (max-width: 960px) {
+  .workflow-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (max-width: 760px) {
   .app-shell {
     width: min(100% - 20px, 1180px);
     padding-top: 24px;
   }
 
-  .workflow-steps {
-    grid-template-columns: 1fr;
-  }
+  .workflow-steps { grid-template-columns: 1fr; }
+  .section-header, .composer-footer { align-items: stretch; flex-direction: column; }
+  .result-actions, .review-actions { width: 100%; }
 
-  .section-header, .composer-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .result-actions {
-    width: 100%;
-  }
-
-  .secondary-button {
+  .secondary-button, .review-actions button {
     flex: 1 1 100%;
     text-align: center;
   }
