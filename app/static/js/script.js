@@ -10,9 +10,19 @@ const runStatus = document.getElementById("run-status");
 const blogPreview = document.getElementById("blog-preview");
 const downloadMd = document.getElementById("download-md");
 const downloadPackage = document.getElementById("download-package");
+const resultActions = document.getElementById("result-actions");
+const reviewPanel = document.getElementById("review-panel");
+const reviewQuestion = document.getElementById("review-question");
+const reviewInstruction = document.getElementById("review-instruction");
+const reviewFeedback = document.getElementById("review-feedback");
+const reviewStatus = document.getElementById("review-status");
+const approveButton = document.getElementById("approve-btn");
+const reviseButton = document.getElementById("revise-btn");
 
-const stageOrder = ["planning", "research", "writing", "images", "finalizing"];
+const stageOrder = ["planning", "research", "writing", "images", "finalizing", "review"];
 const stageIndex = Object.fromEntries(stageOrder.map((stage, index) => [stage, index]));
+let currentJobId = null;
+let reviewSubmissionInProgress = false;
 
 function updateCharCount() {
   charCount.textContent = `${topicInput.value.length} / 500`;
@@ -21,8 +31,14 @@ function updateCharCount() {
 function resetUI() {
   progressSection.classList.remove("hidden");
   resultSection.classList.add("hidden");
+  reviewPanel.classList.add("hidden");
+  resultActions.classList.add("hidden");
   errorSection.classList.add("hidden");
   eventLog.innerHTML = "";
+  reviewFeedback.value = "";
+  reviewStatus.textContent = "";
+  currentJobId = null;
+  reviewSubmissionInProgress = false;
 
   document.querySelectorAll(".workflow-step").forEach((step) => {
     step.classList.remove("active", "done");
@@ -57,11 +73,11 @@ function appendEvent(payload) {
 
   const time = document.createElement("span");
   time.className = "event-time";
-  time.textContent = `[${payload.timestamp}]`;
+  time.textContent = `[${payload.timestamp || "--:--:--"}]`;
 
   const message = document.createElement("span");
   message.className = "event-message";
-  message.textContent = payload.message;
+  message.textContent = payload.message || "";
 
   row.append(time, message);
   eventLog.appendChild(row);
@@ -82,6 +98,16 @@ function prepareMarkdown(markdown, jobId) {
   );
 }
 
+function renderMarkdown(jobId, markdown) {
+  const prepared = prepareMarkdown(markdown || "", jobId);
+  const rendered = marked.parse(prepared, {
+    gfm: true,
+    breaks: false,
+  });
+
+  blogPreview.innerHTML = DOMPurify.sanitize(rendered);
+}
+
 function markWorkflowComplete() {
   runStatus.textContent = "Completed";
 
@@ -93,26 +119,46 @@ function markWorkflowComplete() {
 }
 
 function renderResult(jobId, data) {
-  const prepared = prepareMarkdown(data.markdown || "", jobId);
-  const rendered = marked.parse(prepared, {
-    gfm: true,
-    breaks: false,
-  });
+  currentJobId = jobId;
+  renderMarkdown(jobId, data.markdown || "");
 
-  blogPreview.innerHTML = DOMPurify.sanitize(rendered);
-  downloadMd.href = data.download_url;
-  downloadPackage.href = data.package_url;
+  if (data.download_url) downloadMd.href = data.download_url;
+  if (data.package_url) downloadPackage.href = data.package_url;
 
+  reviewPanel.classList.add("hidden");
+  resultActions.classList.remove("hidden");
   resultSection.classList.remove("hidden");
+  reviewStatus.textContent = "";
   markWorkflowComplete();
 }
 
+function showReview(jobId, data) {
+  currentJobId = jobId;
+  renderMarkdown(jobId, data.blog || data.markdown || "");
+
+  reviewQuestion.textContent = data.question || "Do you approve this blog?";
+  reviewInstruction.textContent = data.instruction || "Review the content. Approve it or request specific changes.";
+  reviewFeedback.value = "";
+  reviewStatus.textContent = "";
+
+  resultSection.classList.remove("hidden");
+  reviewPanel.classList.remove("hidden");
+  resultActions.classList.add("hidden");
+  runStatus.textContent = "Awaiting review";
+  setStage("review");
+}
+
 async function showResult(jobId) {
-  const response = await fetch(`/api/blog/${jobId}`);
+  const response = await fetch(`/api/blog/${encodeURIComponent(jobId)}`);
   const data = await response.json();
 
   if (!response.ok) {
     throw new Error(data.error || "Unable to load generated blog.");
+  }
+
+  if (data.status === "awaiting_review") {
+    showReview(jobId, data);
+    return;
   }
 
   renderResult(jobId, data);
@@ -123,14 +169,27 @@ function connectToStream(streamUrl, jobId) {
     const source = new EventSource(streamUrl);
 
     source.onmessage = async (event) => {
-      const payload = JSON.parse(event.data);
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch (error) {
+        source.close();
+        reject(new Error("The server sent an invalid progress event."));
+        return;
+      }
+
       appendEvent(payload);
+
+      if (payload.stage === "review" && payload.status === "awaiting_review") {
+        source.close();
+        showReview(jobId, payload.data || {});
+        resolve();
+        return;
+      }
 
       if (payload.stage === "complete" && payload.status === "completed") {
         source.close();
         try {
-          // The completion event now contains the final Markdown and download
-          // URLs from the same LangGraph execution. No second request is needed.
           if (payload.data && payload.data.markdown) {
             renderResult(jobId, {
               markdown: payload.data.markdown,
@@ -149,7 +208,7 @@ function connectToStream(streamUrl, jobId) {
 
       if (payload.stage === "error" || payload.status === "failed") {
         source.close();
-        reject(new Error(payload.message));
+        reject(new Error(payload.message || "Blog generation failed."));
         return;
       }
 
@@ -162,6 +221,60 @@ function connectToStream(streamUrl, jobId) {
     };
   });
 }
+
+async function submitReview(approved) {
+  if (!currentJobId || reviewSubmissionInProgress) return;
+
+  const feedback = reviewFeedback.value.trim();
+
+  if (!approved && !feedback) {
+    reviewStatus.textContent = "Enter revision suggestions before requesting changes.";
+    reviewFeedback.focus();
+    return;
+  }
+
+  reviewSubmissionInProgress = true;
+  approveButton.disabled = true;
+  reviseButton.disabled = true;
+  reviewStatus.textContent = approved
+    ? "Submitting approval..."
+    : "Revising the blog with your feedback...";
+
+  try {
+    const response = await fetch(
+      `/api/blog/${encodeURIComponent(currentJobId)}/review`,
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({approved, feedback}),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to submit review.");
+    }
+
+    if (data.status === "awaiting_review") {
+      showReview(currentJobId, data);
+      reviewStatus.textContent = "Revised blog ready. Review the new version.";
+    } else if (data.status === "completed") {
+      renderResult(currentJobId, data);
+    } else {
+      throw new Error("Unexpected response from the review endpoint.");
+    }
+  } catch (error) {
+    reviewStatus.textContent = error.message || "Unable to submit review.";
+  } finally {
+    reviewSubmissionInProgress = false;
+    approveButton.disabled = false;
+    reviseButton.disabled = false;
+  }
+}
+
+approveButton.addEventListener("click", () => submitReview(true));
+reviseButton.addEventListener("click", () => submitReview(false));
 
 generateButton.addEventListener("click", async () => {
   const topic = topicInput.value.trim();
@@ -190,6 +303,7 @@ generateButton.addEventListener("click", async () => {
       throw new Error(data.error || "Unable to start generation.");
     }
 
+    currentJobId = data.id;
     await connectToStream(data.stream_url, data.id);
   } catch (error) {
     errorSection.classList.remove("hidden");
