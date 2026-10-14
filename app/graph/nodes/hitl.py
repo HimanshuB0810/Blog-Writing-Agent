@@ -14,50 +14,54 @@ logger = get_logger(__name__)
 
 
 def human_review(state: State) -> dict:
-    try:
+    # Do not wrap interrupt() in a broad try/except.
+    # LangGraph uses an internal control-flow exception to pause execution.
+    blog = state.get("final_after_review") or state["final"]
 
-        # Review the latest version available.
-        blog = state.get("final_after_review") or state["final"]
+    decision = interrupt({
+        "blog": blog,
+        "question": "Do you approve this blog?",
+        "instruction": (
+            "Approve the blog or request changes with specific feedback."
+        ),
+    })
 
-        decision = interrupt({
-            "blog": blog,
-            "question": "Do you approve this blog?",
-            "instruction": (
-                "Approve the blog or request changes "
-                "with specific feedback."
-            )
-        })
+    if not isinstance(decision, dict):
+        raise ValueError("Review response must be a dictionary.")
 
-        approved = bool(decision.get("approved", False))
-        feedback = str(decision.get("feedback", "")).strip()
+    approved = decision.get("approved")
+    if not isinstance(approved, bool):
+        raise ValueError("'approved' must be a boolean.")
 
-        if not approved and not feedback:
-            raise ValueError("Feedback is required when requesting revisions.")
+    feedback = str(decision.get("feedback", "")).strip()
 
-        logger.info("Interrupt Occured")
+    if not approved and not feedback:
+        raise ValueError("Feedback is required when requesting revisions.")
 
-        return {
-            "approved": approved,
-            "feedback": "" if approved else feedback
-        }
-    except Exception as e:
-            logger.error(f"Error in human_review Node {e}")
-            raise CustomException("Error in human_review Node",e)
+    logger.info("Human review received")
+
+    return {
+        "approved": approved,
+        "feedback": "" if approved else feedback,
+    }
 
 
 def revise_blog(state: State) -> dict:
     try:
-        current_blog = (state.get("final_after_review") or state["final"])
+        current_blog = state.get("final_after_review") or state["final"]
 
         response = llm.invoke([
             SystemMessage(content=REVIEW_BLOG),
             HumanMessage(content=f"""
-            CURRENT BLOG:
-            {current_blog}
+CURRENT BLOG:
+{current_blog}
 
-            HUMAN FEEDBACK:
-            {state["feedback"]}
-            """)
+HUMAN FEEDBACK:
+{state["feedback"]}
+
+Revise the complete blog according to the feedback. Return only the complete
+revised blog in Markdown.
+"""),
         ])
 
         content = response.content
@@ -70,24 +74,25 @@ def revise_blog(state: State) -> dict:
                 for block in content
             )
 
-        logger.info("Blog Revised According to the Feedback")
+        revised_blog = content.strip()
+        if not revised_blog:
+            raise ValueError("The model returned an empty revised blog.")
+
+        logger.info("Blog revised according to human feedback")
 
         return {
-            "final_after_review": content.strip(),
+            "final_after_review": revised_blog,
             "approved": False,
-            "feedback": ""
+            "feedback": "",
         }
 
     except Exception as e:
-            logger.error(f"Error in human_review Node {e}")
-            raise CustomException("Error in human_review Node",e)
+        logger.exception("Error in revise_blog node")
+        raise CustomException("Error in revise_blog node", e)
 
 
 def route_after_review(state: State) -> str:
-    if state["approved"]:
-        return "approved"
-
-    return "revise"
+    return "approved" if state["approved"] else "revise"
 
 
 def save_approved_blog(state: State) -> dict:
@@ -95,18 +100,13 @@ def save_approved_blog(state: State) -> dict:
     blog_dir = project_root.parent / "REVISED_BLOG"
     blog_dir.mkdir(parents=True, exist_ok=True)
 
-    approved_blog = (
-        state.get("final_after_review") or state["final"]
-    )
-
+    approved_blog = state.get("final_after_review") or state["final"]
     title = state["plan"].blog_title
-    output_path = blog_dir / f"{title}.md"
 
-    output_path.write_text(
-        approved_blog,
-        encoding="utf-8"
-    )
+    # Avoid path traversal and ensure the result remains a Markdown file.
+    safe_title = Path(title).name.replace("/", "_").replace("\\", "_")
+    output_path = blog_dir / f"{safe_title}.md"
+    output_path.write_text(approved_blog, encoding="utf-8")
 
-    return {
-        "final_after_review": approved_blog
-    }
+    logger.info("Approved blog saved to %s", output_path)
+    return {"final_after_review": approved_blog}
